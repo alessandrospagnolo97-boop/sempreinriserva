@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Calcola quanti chilometri percorri con un importo in euro di benzina o gasolio, al prezzo medio di Roma.">
+<meta name="color-scheme" content="light dark">
+<title>Quanti km faccio con il carburante?</title>
+<style>
+:root{
+  --bg:#f3f3f1; --surface:#fff; --text:#1b1c1b; --muted:#5f625f; --line:#d6d7d3;
+  --accent:#0b5fd1; --on-accent:#fff; --danger:#b3261e;
+  --item:40px;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#141514; --surface:#1d1f1d; --text:#ececea; --muted:#a0a39f; --line:#383a37;
+    --accent:#6ba8ff; --on-accent:#06182f; --danger:#ff8a80;}
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));
+}
+main{max-width:480px;margin:0 auto}
+h1{font-size:1rem;font-weight:600;margin:0 0 4px;color:var(--muted)}
+.result{
+  margin:0 0 20px; font-weight:700; letter-spacing:-.02em; line-height:1.05;
+  font-size:clamp(2.6rem,15vw,4.5rem); color:var(--accent); font-variant-numeric:tabular-nums;
+  overflow-wrap:anywhere;
+}
+.wheels{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field label,.legend{display:block;font-size:.875rem;font-weight:600;color:var(--muted);margin:0 0 6px}
+.wheel{position:relative;height:calc(var(--item)*5);background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.list{
+  height:100%;overflow-y:auto;scroll-snap-type:y mandatory;scrollbar-width:none;
+  padding:calc(var(--item)*2) 0;overscroll-behavior:contain;touch-action:pan-y;
+  -webkit-overflow-scrolling:touch;cursor:grab;user-select:none;-webkit-user-select:none;outline:none;
+}
+.list::-webkit-scrollbar{display:none}
+.list.drag{cursor:grabbing;scroll-snap-type:none}
+.item{
+  height:var(--item);line-height:var(--item);text-align:center;scroll-snap-align:start;
+  font-size:1.25rem;font-variant-numeric:tabular-nums;color:var(--muted);opacity:.25;
+}
+.item[data-d="0"]{opacity:1;color:var(--text);font-size:1.5rem;font-weight:600}
+.item[data-d="1"]{opacity:.6}
+.item[data-d="2"]{opacity:.35}
+.band{
+  position:absolute;left:0;right:0;top:calc(var(--item)*2);height:var(--item);
+  border-block:2px solid var(--accent);pointer-events:none;
+}
+.unit{position:absolute;right:12px;top:calc(var(--item)*2);line-height:var(--item);font-size:.875rem;color:var(--muted);pointer-events:none}
+.wheel:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.edit{
+  position:absolute;left:0;right:0;top:calc(var(--item)*2);height:var(--item);
+  width:100%;border:0;margin:0;padding:0 36px;text-align:center;background:var(--surface);color:var(--text);
+  font:600 1.5rem system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums;outline:none;
+}
+.edit[hidden]{display:none}
+.err{min-height:1.25em;margin:4px 0 0;font-size:.8125rem;color:var(--danger)}
+fieldset{border:0;margin:6px 0 0;padding:0;min-width:0}
+.fuels{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fuels input{position:absolute;opacity:0;pointer-events:none}
+.fuels label{
+  display:flex;align-items:center;justify-content:center;min-height:52px;border:1px solid var(--line);
+  border-radius:10px;background:var(--surface);font-size:1.0625rem;font-weight:600;cursor:pointer;
+}
+.fuels input:checked+label{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.fuels input:focus-visible+label{outline:2px solid var(--accent);outline-offset:2px}
+.price{margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}
+.price-val{margin:0;font-size:1.5rem;font-weight:700;font-variant-numeric:tabular-nums}
+.price-meta,.status{margin:2px 0 0;font-size:.875rem;color:var(--muted)}
+.status.bad{color:var(--danger)}
+button.link{
+  font:inherit;font-size:.875rem;color:var(--accent);background:none;border:0;padding:6px 0;text-decoration:underline;cursor:pointer;min-height:32px;
+}
+.manual{display:flex;gap:8px;align-items:flex-end;margin-top:8px}
+.manual[hidden]{display:none}
+.manual label{flex:1;font-size:.875rem;color:var(--muted)}
+.manual input{
+  display:block;width:100%;margin-top:4px;height:44px;padding:0 10px;font:inherit;font-size:1rem;
+  border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);
+}
+.manual button{
+  height:44px;padding:0 16px;font:inherit;font-weight:600;border:0;border-radius:8px;background:var(--accent);color:var(--on-accent);cursor:pointer;
+}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.src{margin:16px 0 0;font-size:.75rem;color:var(--muted)}
+.src a{color:inherit}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (max-height:640px){.result{margin-bottom:12px}.price{margin-top:10px}}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Quanti km faccio con il carburante?</h1>
+  <p class="result" id="result">— km</p>
+  <p class="sr" id="live" role="status" aria-live="polite"></p>
+
+  <div class="wheels">
+    <div class="field">
+      <label id="l-c">Consumo</label>
+      <div class="wheel" id="w-c"></div>
+      <p class="err" id="e-c" role="alert"></p>
+    </div>
+    <div class="field">
+      <label id="l-e">Importo</label>
+      <div class="wheel" id="w-e"></div>
+      <p class="err" id="e-e" role="alert"></p>
+    </div>
+  </div>
+
+  <fieldset>
+    <legend class="legend">Carburante</legend>
+    <div class="fuels">
+      <input type="radio" name="fuel" id="f-benzina" value="benzina"><label for="f-benzina">Benzina</label>
+      <input type="radio" name="fuel" id="f-gasolio" value="gasolio"><label for="f-gasolio">Gasolio</label>
+    </div>
+  </fieldset>
+
+  <section class="price" aria-label="Prezzo del carburante">
+    <p class="price-val" id="price-val">—</p>
+    <p class="price-meta" id="price-meta"></p>
+    <p class="status" id="status"></p>
+    <button type="button" class="link" id="retry" hidden>Riprova ad aggiornare</button>
+    <form class="manual" id="manual" hidden>
+      <label>Prezzo al litro in €
+        <input id="manual-in" inputmode="decimal" autocomplete="off" placeholder="es. 1,85" aria-describedby="manual-err">
+      </label>
+      <button type="submit">Usa prezzo</button>
+    </form>
+    <p class="err" id="manual-err" role="alert"></p>
+  </section>
+
+  <p class="src">Fonte: <a href="https://mappacarburanti.it/" target="_blank" rel="noopener">Mappa Carburanti Italia — dati MIMIT, licenza CC0</a></p>
+</main>
+
+<script>
+(function(){
+'use strict';
+var KEY='kmcarb:v1', URL_API='https://mappacarburanti.it/api/prezzi/citta/roma.json', PROXY='/api/roma';
+var ITEM=40;
+var $=function(id){return document.getElementById(id)};
+
+/* ---------- stato e storage ---------- */
+var state={consumo:15,euro:30,fuel:'benzina',prices:{}};
+try{
+  var s=JSON.parse(localStorage.getItem(KEY)||'null');
+  if(s){
+    if(isFinite(s.consumo)&&s.consumo>=3&&s.consumo<=40)state.consumo=Math.round(s.consumo);
+    if(isFinite(s.euro)&&s.euro>=5&&s.euro<=500)state.euro=Math.round(s.euro/5)*5;
+    if(s.fuel==='gasolio'||s.fuel==='benzina')state.fuel=s.fuel;
+    if(s.prices&&typeof s.prices==='object')['benzina','gasolio'].forEach(function(k){
+      var p=s.prices[k]; if(p&&validPrice(p.value))state.prices[k]={value:p.value,date:p.date||null,manual:!!p.manual};
+    });
+  }
+}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
+function validPrice(v){return typeof v==='number'&&isFinite(v)&&v>=0.3&&v<=5}
+var net='loading'; /* loading | live | failed */
+
+/* ---------- utilità ---------- */
+var nf0=new Intl.NumberFormat('it-IT',{maximumFractionDigits:0});
+var nf3=new Intl.NumberFormat('it-IT',{minimumFractionDigits:3,maximumFractionDigits:3});
+function fmtDate(d){
+  var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(d||''); if(!m)return null;
+  return new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'});
+}
+function parseNum(t){
+  t=String(t).trim().replace(/\s/g,'').replace(',','.');
+  return /^\d+(\.\d+)?$/.test(t)?parseFloat(t):NaN;
+}
+
+/* ---------- selettore a rotella ---------- */
+function Wheel(root,cfg){
+  var n=Math.round((cfg.max-cfg.min)/cfg.step)+1, cur=0, vals=[];
+  var list=document.createElement('div'); list.className='list';
+  list.tabIndex=0; list.setAttribute('role','spinbutton'); list.setAttribute('aria-labelledby',cfg.labelId);
+  list.setAttribute('aria-valuemin',cfg.min); list.setAttribute('aria-valuemax',cfg.max);
+  var frag=document.createDocumentFragment(), items=[];
+  for(var i=0;i<n;i++){
+    var v=Math.round((cfg.min+i*cfg.step)*100)/100; vals.push(v);
+    var it=document.createElement('div'); it.className='item'; it.textContent=fmt(v); it.dataset.i=i; it.setAttribute('aria-hidden','true');
+    items.push(it); frag.appendChild(it);
+  }
+  list.appendChild(frag);
+  var band=document.createElement('div'); band.className='band';
+  var unit=document.createElement('span'); unit.className='unit'; unit.textContent=cfg.unit;
+  var edit=document.createElement('input'); edit.className='edit'; edit.hidden=true;
+  edit.setAttribute('inputmode',cfg.dec?'decimal':'numeric'); edit.setAttribute('autocomplete','off');
+  edit.setAttribute('aria-label',cfg.name+' (digita il valore)');
+  root.append(list,band,unit,edit);
+  var errEl=$(cfg.errId), errT;
+
+  function fmt(v){return cfg.dec?v.toFixed(1).replace('.',','):String(v)}
+  function clampIdx(i){return Math.max(0,Math.min(n-1,i))}
+  function mark(){
+    for(var k=cur-3;k<=cur+3;k++){ if(items[k])items[k].dataset.d=Math.min(Math.abs(k-cur),3); }
+    list.setAttribute('aria-valuenow',vals[cur]);
+    list.setAttribute('aria-valuetext',fmt(vals[cur])+' '+cfg.unit);
+  }
+  function clearMarks(){items.forEach(function(e){e.removeAttribute('data-d')})}
+  function setIdx(i,smooth){
+    i=clampIdx(i);
+    clearMarks(); cur=i; mark();
+    list.scrollTo({top:i*ITEM,behavior:smooth?'smooth':'auto'});
+  }
+  function error(msg){
+    errEl.textContent=msg; clearTimeout(errT); errT=setTimeout(function(){errEl.textContent=''},4000);
+  }
+  function setValue(v){setIdx(Math.round((v-cfg.min)/cfg.step),false)}
+
+  list.addEventListener('scroll',function(){
+    var i=clampIdx(Math.round(list.scrollTop/ITEM));
+    if(i!==cur){clearMarks();cur=i;mark();cfg.onChange(vals[cur])}
+  },{passive:true});
+
+  list.addEventListener('keydown',function(e){
+    var d={ArrowUp:-1,ArrowDown:1,PageUp:-10,PageDown:10}[e.key];
+    if(d!==undefined){e.preventDefault();setIdx(cur+d,true)}
+    else if(e.key==='Home'){e.preventDefault();setIdx(0,true)}
+    else if(e.key==='End'){e.preventDefault();setIdx(n-1,true)}
+    else if(e.key==='Enter'||/^[0-9]$/.test(e.key)){e.preventDefault();openEdit(/^[0-9]$/.test(e.key)?e.key:null)}
+  });
+
+  /* trascinamento col mouse */
+  var drag=null, moved=false;
+  list.addEventListener('pointerdown',function(e){
+    if(e.pointerType!=='mouse'||e.button!==0)return;
+    drag={y:e.clientY,top:list.scrollTop}; moved=false; list.setPointerCapture(e.pointerId);
+  });
+  list.addEventListener('pointermove',function(e){
+    if(!drag)return;
+    var dy=e.clientY-drag.y;
+    if(!moved&&Math.abs(dy)>4){moved=true;list.classList.add('drag')}
+    if(moved)list.scrollTop=drag.top-dy;
+  });
+  function endDrag(){
+    if(!drag)return; drag=null; list.classList.remove('drag');
+    if(moved)list.scrollTo({top:clampIdx(Math.round(list.scrollTop/ITEM))*ITEM,behavior:'smooth'});
+  }
+  list.addEventListener('pointerup',endDrag);
+  list.addEventListener('pointercancel',endDrag);
+
+  /* tocco su una voce: la porta al centro; se è già al centro, permette di digitare */
+  list.addEventListener('click',function(e){
+    if(moved){moved=false;return}
+    var t=e.target.closest('.item'); if(!t)return;
+    var i=+t.dataset.i;
+    if(i===cur)openEdit(null); else setIdx(i,true);
+  });
+
+  var editing=false;
+  function openEdit(first){
+    editing=true; edit.hidden=false; edit.value=first!==null?first:fmt(vals[cur]);
+    edit.focus(); if(first===null)edit.select();
+  }
+  function closeEdit(commit){
+    if(!editing)return; editing=false;
+    var raw=edit.value; edit.hidden=true;
+    if(commit){
+      var v=parseNum(raw);
+      if(!isFinite(v)||v<cfg.min||v>cfg.max){
+        error('Inserisci un valore tra '+fmt(cfg.min)+' e '+fmt(cfg.max)+' '+cfg.unit+'.');
+      }else{
+        errEl.textContent='';
+        var i=Math.round((v-cfg.min)/cfg.step); setIdx(i,false); cfg.onChange(vals[cur]);
+      }
+    }
+    list.focus({preventScroll:true});
+  }
+  edit.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){e.preventDefault();closeEdit(true)}
+    else if(e.key==='Escape'){e.preventDefault();closeEdit(false)}
+  });
+  edit.addEventListener('blur',function(){closeEdit(true)});
+
+  setValue(cfg.initial);
+  return {set:setValue};
+}
+
+/* ---------- rendering ---------- */
+var elRes=$('result'), elLive=$('live'), liveT;
+function render(){
+  var p=state.prices[state.fuel], valEl=$('price-val'), meta=$('price-meta'), st=$('status');
+  var retry=$('retry'), manual=$('manual');
+  st.className='status'; st.textContent=''; meta.textContent='';
+  retry.hidden=true; manual.hidden=true;
+  var label=state.fuel==='benzina'?'benzina':'gasolio';
+
+  if(p){
+    valEl.textContent=nf3.format(p.value)+' €/l';
+    var d=fmtDate(p.date);
+    if(p.manual) meta.textContent='Prezzo inserito da te, '+label;
+    else meta.textContent='Media Roma, '+label+(d?', dati del '+d:'');
+    if(net==='loading') st.textContent='Aggiorno il prezzo…';
+    else if(net==='failed'){
+      st.className='status bad';
+      st.textContent=p.manual?'Aggiornamento non riuscito: uso il prezzo che hai inserito.'
+        :'Aggiornamento non riuscito: uso l’ultimo prezzo salvato'+(d?' (dati del '+d+')':'')+'.';
+      retry.hidden=false; manual.hidden=false;
+    }
+  }else{
+    valEl.textContent='—';
+    if(net==='loading') st.textContent='Carico il prezzo medio…';
+    else{
+      st.className='status bad';
+      st.textContent='Prezzo non disponibile. Riprova o inseriscilo a mano.';
+      retry.hidden=false; manual.hidden=false;
+    }
+  }
+
+  if(p){
+    var km=state.euro/p.value*state.consumo;
+    var txt='Circa '+nf0.format(Math.round(km))+' km';
+    elRes.textContent=txt;
+    clearTimeout(liveT); liveT=setTimeout(function(){elLive.textContent=txt+' con '+state.euro+' euro di '+label},700);
+  }else{
+    elRes.textContent='— km';
+  }
+}
+
+/* ---------- prezzi ---------- */
+function fetchJSON(url){
+  var ctl=new AbortController(), t=setTimeout(function(){ctl.abort()},8000);
+  return fetch(url,{signal:ctl.signal,headers:{Accept:'application/json'}}).then(function(r){
+    clearTimeout(t); if(!r.ok)throw new Error('HTTP '+r.status); return r.json();
+  },function(e){clearTimeout(t);throw e});
+}
+function apply(data){
+  var ok=false;
+  ['benzina','gasolio'].forEach(function(k){
+    var a=data&&data.fuels&&data.fuels[k]&&data.fuels[k].stats&&data.fuels[k].stats.avg;
+    if(validPrice(a)){
+      state.prices[k]={value:a,date:data.date||null,manual:false}; ok=true;
+    }
+  });
+  if(!ok)throw new Error('dati non validi');
+  save();
+}
+function load(){
+  net='loading'; render();
+  fetchJSON(URL_API).catch(function(){return fetchJSON(PROXY)}).then(function(d){
+    apply(d); net='live'; render();
+  }).catch(function(){net='failed'; render()});
+}
+$('retry').addEventListener('click',load);
+
+$('manual').addEventListener('submit',function(e){
+  e.preventDefault();
+  var v=parseNum($('manual-in').value), err=$('manual-err');
+  if(!isFinite(v)||!validPrice(v)){err.textContent='Inserisci un prezzo tra 0,30 e 5,00 €/l.';return}
+  err.textContent='';
+  state.prices[state.fuel]={value:Math.round(v*1000)/1000,date:null,manual:true};
+  $('manual-in').value=''; save(); render();
+});
+
+/* ---------- avvio ---------- */
+var wc=Wheel($('w-c'),{min:3,max:40,step:1,dec:false,unit:'km/l',name:'Consumo',labelId:'l-c',errId:'e-c',initial:state.consumo,
+  onChange:function(v){state.consumo=v;save();render()}});
+var we=Wheel($('w-e'),{min:5,max:500,step:5,dec:false,unit:'€',name:'Importo',labelId:'l-e',errId:'e-e',initial:state.euro,
+  onChange:function(v){state.euro=v;save();render()}});
+
+document.querySelectorAll('input[name=fuel]').forEach(function(r){
+  r.checked=r.value===state.fuel;
+  r.addEventListener('change',function(){if(r.checked){state.fuel=r.value;save();render()}});
+});
+
+render(); load();
+})();
+</script>
+</body>
+</html>
