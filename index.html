@@ -31,7 +31,8 @@ h1{font-size:1rem;font-weight:600;margin:0 0 4px;color:var(--muted)}
   overflow-wrap:anywhere;
 }
 .wheels{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.field label,.legend{display:block;font-size:.875rem;font-weight:600;color:var(--muted);margin:0 0 6px}
+.field label,.legend{display:block;font-size:.875rem;font-weight:600;color:var(--muted);margin:0 0 6px;text-align:center}
+.legend{width:100%;padding:0}
 .wheel{position:relative;height:calc(var(--item)*5);background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .list{
   height:100%;overflow-y:auto;scroll-snap-type:y mandatory;scrollbar-width:none;
@@ -89,6 +90,7 @@ button.link{
 button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .src{margin:16px 0 0;font-size:.75rem;color:var(--muted)}
 .src a{color:inherit}
+.quote{margin:20px 0 0;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-style:italic;text-align:center;color:var(--muted)}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 @media (max-height:640px){.result{margin-bottom:12px}.price{margin-top:10px}}
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
@@ -116,8 +118,8 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(-
   <fieldset>
     <legend class="legend">Carburante</legend>
     <div class="fuels">
+      <input type="radio" name="fuel" id="f-gasolio" value="gasolio"><label for="f-gasolio">Diesel</label>
       <input type="radio" name="fuel" id="f-benzina" value="benzina"><label for="f-benzina">Benzina</label>
-      <input type="radio" name="fuel" id="f-gasolio" value="gasolio"><label for="f-gasolio">Gasolio</label>
     </div>
   </fieldset>
 
@@ -136,6 +138,8 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(-
   </section>
 
   <p class="src">Fonte: <a href="https://mappacarburanti.it/" target="_blank" rel="noopener">Mappa Carburanti Italia — dati MIMIT, licenza CC0</a></p>
+
+  <p class="quote">tempi duri richiedono l’esistenza di un’app del genere</p>
 </main>
 
 <script>
@@ -146,12 +150,12 @@ var ITEM=40;
 var $=function(id){return document.getElementById(id)};
 
 /* ---------- stato e storage ---------- */
-var state={consumo:15,euro:30,fuel:'benzina',prices:{}};
+var state={consumo:20,euro:30,fuel:'benzina',prices:{}};
 try{
   var s=JSON.parse(localStorage.getItem(KEY)||'null');
   if(s){
     if(isFinite(s.consumo)&&s.consumo>=3&&s.consumo<=40)state.consumo=Math.round(s.consumo);
-    if(isFinite(s.euro)&&s.euro>=5&&s.euro<=500)state.euro=Math.round(s.euro/5)*5;
+    if(isFinite(s.euro)&&s.euro>=5)state.euro=Math.min(100,Math.round(s.euro/5)*5);
     if(s.fuel==='gasolio'||s.fuel==='benzina')state.fuel=s.fuel;
     if(s.prices&&typeof s.prices==='object')['benzina','gasolio'].forEach(function(k){
       var p=s.prices[k]; if(p&&validPrice(p.value))state.prices[k]={value:p.value,date:p.date||null,manual:!!p.manual};
@@ -289,7 +293,7 @@ function render(){
   var retry=$('retry'), manual=$('manual');
   st.className='status'; st.textContent=''; meta.textContent='';
   retry.hidden=true; manual.hidden=true;
-  var label=state.fuel==='benzina'?'benzina':'gasolio';
+  var label=state.fuel==='benzina'?'benzina':'diesel';
 
   if(p){
     valEl.textContent=nf3.format(p.value)+' €/l';
@@ -343,9 +347,10 @@ function apply(data){
 }
 function load(){
   net='loading'; render();
-  fetchJSON(URL_API).catch(function(){return fetchJSON(PROXY)}).then(function(d){
-    apply(d); net='live'; render();
-  }).catch(function(){net='failed'; render()});
+  var errs=[];
+  fetchJSON(PROXY).catch(function(e){errs.push('proxy: '+e.message);return fetchJSON(URL_API)})
+  .then(function(d){apply(d); net='live'; render()})
+  .catch(function(e){errs.push('diretto: '+e.message); console.warn('Prezzi non caricati', errs); net='failed'; render()});
 }
 $('retry').addEventListener('click',load);
 
@@ -361,7 +366,7 @@ $('manual').addEventListener('submit',function(e){
 /* ---------- avvio ---------- */
 var wc=Wheel($('w-c'),{min:3,max:40,step:1,dec:false,unit:'km/l',name:'Consumo',labelId:'l-c',errId:'e-c',initial:state.consumo,
   onChange:function(v){state.consumo=v;save();render()}});
-var we=Wheel($('w-e'),{min:5,max:500,step:5,dec:false,unit:'€',name:'Importo',labelId:'l-e',errId:'e-e',initial:state.euro,
+var we=Wheel($('w-e'),{min:5,max:100,step:5,dec:false,unit:'€',name:'Importo',labelId:'l-e',errId:'e-e',initial:state.euro,
   onChange:function(v){state.euro=v;save();render()}});
 
 document.querySelectorAll('input[name=fuel]').forEach(function(r){
