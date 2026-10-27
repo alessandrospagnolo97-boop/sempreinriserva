@@ -36,7 +36,7 @@ h1{font-size:1rem;font-weight:600;margin:0 0 4px;color:var(--muted)}
 .wheel{position:relative;height:calc(var(--item)*5);background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .list{
   height:100%;overflow-y:auto;scroll-snap-type:y mandatory;scrollbar-width:none;
-  padding:calc(var(--item)*2) 0;overscroll-behavior:contain;touch-action:pan-y;
+  padding:calc(var(--item)*2) 0;scroll-padding-block:calc(var(--item)*2);overscroll-behavior:contain;touch-action:pan-y;
   -webkit-overflow-scrolling:touch;cursor:grab;user-select:none;-webkit-user-select:none;outline:none;
 }
 .list::-webkit-scrollbar{display:none}
@@ -234,12 +234,12 @@ function Wheel(root,cfg){
   var drag=null, moved=false;
   list.addEventListener('pointerdown',function(e){
     if(e.pointerType!=='mouse'||e.button!==0)return;
-    drag={y:e.clientY,top:list.scrollTop}; moved=false; list.setPointerCapture(e.pointerId);
+    drag={y:e.clientY,top:list.scrollTop,id:e.pointerId}; moved=false;
   });
   list.addEventListener('pointermove',function(e){
     if(!drag)return;
     var dy=e.clientY-drag.y;
-    if(!moved&&Math.abs(dy)>4){moved=true;list.classList.add('drag')}
+    if(!moved&&Math.abs(dy)>4){moved=true;list.classList.add('drag');try{list.setPointerCapture(drag.id)}catch(_){}}
     if(moved)list.scrollTop=drag.top-dy;
   });
   function endDrag(){
@@ -252,8 +252,9 @@ function Wheel(root,cfg){
   /* tocco su una voce: la porta al centro; se è già al centro, permette di digitare */
   list.addEventListener('click',function(e){
     if(moved){moved=false;return}
-    var t=e.target.closest('.item'); if(!t)return;
-    var i=+t.dataset.i;
+    var y=e.clientY-list.getBoundingClientRect().top+list.scrollTop-ITEM*2;
+    var i=Math.floor(y/ITEM);
+    if(i<0||i>=n)return;
     if(i===cur)openEdit(null); else setIdx(i,true);
   });
 
