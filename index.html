@@ -33,7 +33,7 @@ h1{font-size:1rem;font-weight:600;margin:0 0 4px;color:var(--muted)}
 .wheels{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .field label,.legend{display:block;font-size:.875rem;font-weight:600;color:var(--muted);margin:0 0 6px;text-align:center}
 .legend{width:100%;padding:0}
-.wheel{position:relative;height:calc(var(--item)*5);background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.wheel{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;position:relative;height:calc(var(--item)*5);background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .list{
   height:100%;overflow-y:auto;scroll-snap-type:y mandatory;scrollbar-width:none;
   padding:calc(var(--item)*2) 0;scroll-padding-block:calc(var(--item)*2);overscroll-behavior:contain;touch-action:pan-y;
@@ -57,7 +57,7 @@ h1{font-size:1rem;font-weight:600;margin:0 0 4px;color:var(--muted)}
 .edit{
   position:absolute;left:0;right:0;top:calc(var(--item)*2);height:var(--item);
   width:100%;border:0;margin:0;padding:0 36px;text-align:center;background:var(--surface);color:var(--text);
-  font:600 1.5rem system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums;outline:none;
+  font:600 1.5rem system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums;outline:none;user-select:text;-webkit-user-select:text;
 }
 .edit[hidden]{display:none}
 .err{min-height:1.25em;margin:4px 0 0;font-size:.8125rem;color:var(--danger)}
@@ -139,7 +139,7 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(-
 
   <p class="src">Fonte: <a href="https://mappacarburanti.it/" target="_blank" rel="noopener">Mappa Carburanti Italia — dati MIMIT, licenza CC0</a></p>
 
-  <p class="quote">tempi duri richiedono l’esistenza di un’app del genere</p>
+  <p class="quote">tempi duri richiedono l’esistenza di un’app del genere.</p>
 </main>
 
 <script>
@@ -194,7 +194,7 @@ function Wheel(root,cfg){
   var band=document.createElement('div'); band.className='band';
   var unit=document.createElement('span'); unit.className='unit'; unit.textContent=cfg.unit;
   var edit=document.createElement('input'); edit.className='edit'; edit.hidden=true;
-  edit.setAttribute('inputmode',cfg.dec?'decimal':'numeric'); edit.setAttribute('autocomplete','off');
+  edit.setAttribute('inputmode','numeric'); edit.setAttribute('autocomplete','off'); edit.setAttribute('maxlength','3');
   edit.setAttribute('aria-label',cfg.name+' (digita il valore)');
   root.append(list,band,unit,edit);
   var errEl=$(cfg.errId), errT;
@@ -207,8 +207,9 @@ function Wheel(root,cfg){
     list.setAttribute('aria-valuetext',fmt(vals[cur])+' '+cfg.unit);
   }
   function clearMarks(){items.forEach(function(e){e.removeAttribute('data-d')})}
+  var settleUntil=0;
   function setIdx(i,smooth){
-    i=clampIdx(i);
+    i=clampIdx(i); if(smooth)settleUntil=Date.now()+400;
     clearMarks(); cur=i; mark();
     list.scrollTo({top:i*ITEM,behavior:smooth?'smooth':'auto'});
   }
@@ -249,9 +250,13 @@ function Wheel(root,cfg){
   list.addEventListener('pointerup',endDrag);
   list.addEventListener('pointercancel',endDrag);
 
+  list.addEventListener('mousedown',function(e){if(e.detail>1)e.preventDefault()});
+  list.addEventListener('dblclick',function(e){e.preventDefault()});
+
   /* tocco su una voce: la porta al centro; se è già al centro, permette di digitare */
   list.addEventListener('click',function(e){
     if(moved){moved=false;return}
+    if(Date.now()<settleUntil)return;
     var y=e.clientY-list.getBoundingClientRect().top+list.scrollTop-ITEM*2;
     var i=Math.floor(y/ITEM);
     if(i<0||i>=n)return;
@@ -281,6 +286,7 @@ function Wheel(root,cfg){
     if(e.key==='Enter'){e.preventDefault();closeEdit(true)}
     else if(e.key==='Escape'){e.preventDefault();closeEdit(false)}
   });
+  edit.addEventListener('input',function(){var c=edit.value.replace(/\D/g,'');if(c!==edit.value)edit.value=c});
   edit.addEventListener('blur',function(){closeEdit(true)});
 
   setValue(cfg.initial);
